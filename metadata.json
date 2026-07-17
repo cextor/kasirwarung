@@ -1,0 +1,6 @@
+{
+  "name": "Kasir Warung",
+  "description": "Aplikasi manajemen kasir warung dengan input produk, rekap penjualan, produk terlaris, dan cetak struk via Bluetooth printer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
