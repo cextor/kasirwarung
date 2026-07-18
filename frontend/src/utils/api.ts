@@ -1,8 +1,8 @@
 import { Category, Product, Sale } from '../types';
 
 const getApiBaseUrl = () => {
-  // If in development mode (running on port 5173), direct requests to backend spark port (8080)
-  if (window.location.port === '5173') {
+  // If in development mode (running on port 3000 or 5173), direct requests to backend spark port (8080)
+  if (window.location.port === '3000' || window.location.port === '5173') {
     return 'http://localhost:8080/api';
   }
   // Otherwise, use relative path relative to current URL pathname (so it works on XAMPP)
