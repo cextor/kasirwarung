@@ -1,6 +1,20 @@
 import { Category, Product, Sale } from '../types';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const getApiBaseUrl = () => {
+  // If in development mode (running on port 5173), direct requests to backend spark port (8080)
+  if (window.location.port === '5173') {
+    return 'http://localhost:8080/api';
+  }
+  // Otherwise, use relative path relative to current URL pathname (so it works on XAMPP)
+  let path = window.location.pathname;
+  if (path.endsWith('.html') || path.endsWith('.php')) {
+    path = path.substring(0, path.lastIndexOf('/'));
+  }
+  path = path.replace(/\/+$/, ''); // strip trailing slash
+  return `${window.location.origin}${path}/api`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
