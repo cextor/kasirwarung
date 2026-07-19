@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Product, Category } from '../types';
 import { Plus, Trash2, Edit2, ShoppingBag, Search, Filter, RefreshCcw, Tag, X } from 'lucide-react';
 import { formatRupiah } from '../utils/bluetoothPrinter';
@@ -10,6 +10,7 @@ interface ProductManagementProps {
   onAddProduct: (product: Omit<Product, 'id'>) => void;
   onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
+  onAddCategory: (category: Omit<Category, 'id'>) => Promise<Category | undefined>;
 }
 
 export default function ProductManagement({
@@ -18,6 +19,7 @@ export default function ProductManagement({
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
+  onAddCategory,
 }: ProductManagementProps) {
   // Form State
   const [name, setName] = useState('');
@@ -32,6 +34,96 @@ export default function ProductManagement({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Select2 Category states
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
+
+  // Close category dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+        setIsCategoryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Focus barcode input when modal is opened
+  useEffect(() => {
+    if (isModalOpen) {
+      const timer = setTimeout(() => {
+        barcodeInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isModalOpen]);
+
+  // Global scanner listener: open add modal when scanning a barcode outside inputs
+  useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If modal is open, let the modal's input handle it
+      if (isModalOpen) return;
+
+      // Ignore modifier keys
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // If user is focusing on an input (like search filter), do not intercept
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      const currentTime = Date.now();
+      
+      // Barcode scanner typed characters are very fast (typically < 30ms delay).
+      // If the delay is > 100ms, it is a slow manual type, so reset the buffer.
+      if (currentTime - lastKeyTime > 100) {
+        buffer = '';
+      }
+      
+      lastKeyTime = currentTime;
+
+      if (e.key === 'Enter') {
+        if (buffer.length >= 6 && /^\d+$/.test(buffer)) {
+          e.preventDefault();
+          
+          // Check if barcode already exists
+          const existingProduct = products.find((p) => p.barcode === buffer);
+          if (existingProduct) {
+            Swal.fire({
+              title: 'Barcode Sudah Digunakan',
+              html: `Kode barcode <strong>${buffer}</strong> sudah digunakan oleh produk:<br/><br/><strong class="text-indigo-600 text-lg">${existingProduct.name}</strong>`,
+              icon: 'warning',
+              confirmButtonColor: '#4f46e5'
+            });
+            buffer = '';
+            return;
+          }
+
+          resetForm();
+          setBarcode(buffer);
+          setIsModalOpen(true);
+          buffer = '';
+        }
+      } else if (e.key.length === 1 && /^\d+$/.test(e.key)) {
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isModalOpen, products]);
+
 
   // Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,6 +154,40 @@ export default function ProductManagement({
       isActive,
     };
 
+    // Validate unique name
+    const nameLower = name.trim().toLowerCase();
+    const isNameDuplicate = editingProduct
+      ? products.some((p) => p.id !== editingProduct.id && p.name.toLowerCase() === nameLower)
+      : products.some((p) => p.name.toLowerCase() === nameLower);
+
+    if (isNameDuplicate) {
+      Swal.fire({
+        title: 'Nama Produk Sudah Digunakan',
+        text: `Nama produk "${name.trim()}" sudah terdaftar di katalog. Silakan gunakan nama produk lain.`,
+        icon: 'warning',
+        confirmButtonColor: '#4f46e5'
+      });
+      return;
+    }
+
+    // Validate unique barcode
+    const barcodeTrimmed = barcode.trim();
+    if (barcodeTrimmed) {
+      const existingProduct = products.find(
+        (p) => (editingProduct ? p.id !== editingProduct.id : true) && p.barcode === barcodeTrimmed
+      );
+
+      if (existingProduct) {
+        Swal.fire({
+          title: 'Barcode Sudah Digunakan',
+          html: `Kode barcode <strong>${barcodeTrimmed}</strong> sudah digunakan oleh produk:<br/><br/><strong class="text-indigo-600 text-lg">${existingProduct.name}</strong>`,
+          icon: 'warning',
+          confirmButtonColor: '#4f46e5'
+        });
+        return;
+      }
+    }
+
     if (editingProduct) {
       onUpdateProduct({
         ...editingProduct,
@@ -69,10 +195,6 @@ export default function ProductManagement({
       });
       setEditingProduct(null);
     } else {
-      // Check duplicate barcode
-      if (barcode.trim() && products.some((p) => p.barcode === barcode.trim())) {
-        return setError('Kode barcode sudah digunakan oleh produk lain.');
-      }
       onAddProduct(productData);
     }
 
@@ -92,6 +214,45 @@ export default function ProductManagement({
     setEditingProduct(null);
     setError('');
     setIsModalOpen(false);
+    setIsCategoryDropdownOpen(false);
+    setCategorySearch('');
+  };
+
+  const handleQuickAddCategory = () => {
+    Swal.fire({
+      title: 'Tambah Kategori Baru',
+      input: 'text',
+      inputLabel: 'Nama Kategori',
+      inputPlaceholder: 'Contoh: Sembako, Rokok, Mie...',
+      showCancelButton: true,
+      confirmButtonText: 'Simpan',
+      cancelButtonText: 'Batal',
+      confirmButtonColor: '#4f46e5',
+      cancelButtonColor: '#94a3b8',
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return 'Nama kategori wajib diisi!';
+        }
+        const exists = categories.some((c) => c.name.toLowerCase() === value.trim().toLowerCase());
+        if (exists) {
+          return 'Nama kategori sudah digunakan!';
+        }
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed && result.value) {
+        const categoryName = result.value.trim();
+        try {
+          const created = await onAddCategory({ name: categoryName, description: '' });
+          if (created) {
+            setCategoryId(created.id);
+            setIsCategoryDropdownOpen(false);
+            setCategorySearch('');
+          }
+        } catch (err) {
+          console.error('Gagal menambah kategori cepat:', err);
+        }
+      }
+    });
   };
 
   const handleEdit = (product: Product) => {
@@ -131,23 +292,25 @@ export default function ProductManagement({
     setBarcode(randomCode);
   };
 
-  // Filtering Logic
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.barcode && product.barcode.includes(searchQuery));
-    
-    const matchesCategory = selectedCategoryFilter === '' || product.categoryId === selectedCategoryFilter;
-    
-    let matchesStock = true;
-    if (stockFilter === 'low') {
-      matchesStock = product.stock > 0 && product.stock <= 5;
-    } else if (stockFilter === 'out') {
-      matchesStock = product.stock === 0;
-    }
+  // Filtering & Sorting Logic
+  const filteredProducts = products
+    .filter((product) => {
+      const matchesSearch =
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (product.barcode && product.barcode.includes(searchQuery));
+      
+      const matchesCategory = selectedCategoryFilter === '' || product.categoryId === selectedCategoryFilter;
+      
+      let matchesStock = true;
+      if (stockFilter === 'low') {
+        matchesStock = product.stock > 0 && product.stock <= 5;
+      } else if (stockFilter === 'out') {
+        matchesStock = product.stock === 0;
+      }
 
-    return matchesSearch && matchesCategory && matchesStock;
-  });
+      return matchesSearch && matchesCategory && matchesStock;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'id'));
 
   return (
     <div className="flex flex-col gap-6" id="product-mgmt-container">
@@ -177,21 +340,6 @@ export default function ProductManagement({
             {/* Modal Body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1" id="product-form">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Nama Produk */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">
-                    Nama Produk <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800"
-                    placeholder="Contoh: Indomie Goreng Spesial"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    id="product-name"
-                  />
-                </div>
-
                 {/* Barcode */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
@@ -208,6 +356,7 @@ export default function ProductManagement({
                     </button>
                   </div>
                   <input
+                    ref={barcodeInputRef}
                     type="text"
                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800 font-mono text-sm"
                     placeholder="Contoh: 8999906101901"
@@ -216,25 +365,112 @@ export default function ProductManagement({
                     id="product-barcode"
                   />
                 </div>
+
+                {/* Nama Produk */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">
+                    Nama Produk <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800"
+                    placeholder="Contoh: Indomie Goreng Spesial"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    id="product-name"
+                  />
+                </div>
                 
-                {/* Kategori */}
+                {/* Kategori (Select2 replica in React) */}
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1">
                     Kategori <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800 bg-white"
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                    id="product-category"
-                  >
-                    <option value="">Pilih Kategori</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1" ref={categoryDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                          setCategorySearch('');
+                        }}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800 bg-white flex justify-between items-center text-left text-sm"
+                        id="product-category-select2-btn"
+                      >
+                        <span className={categoryId ? 'text-slate-800 font-medium' : 'text-slate-400'}>
+                          {categories.find((c) => c.id === categoryId)?.name || 'Pilih Kategori'}
+                        </span>
+                        <span className="text-slate-400 text-xs">▼</span>
+                      </button>
+
+                      {isCategoryDropdownOpen && (
+                        <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-72">
+                          {/* Search input */}
+                          <div className="p-2 border-b border-slate-100 bg-slate-50">
+                            <input
+                              type="text"
+                              className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
+                              placeholder="Cari kategori..."
+                              value={categorySearch}
+                              onChange={(e) => setCategorySearch(e.target.value)}
+                              autoFocus
+                              id="select2-search-input"
+                            />
+                          </div>
+                          {/* Categories List */}
+                          <div className="overflow-y-auto max-h-48 divide-y divide-slate-50">
+                            {[...categories].filter((c) => c.name.toLowerCase().includes(categorySearch.toLowerCase())).length === 0 ? (
+                              <div className="p-3 text-xs text-slate-400 text-center">Kategori tidak ditemukan</div>
+                            ) : (
+                              [...categories]
+                                .filter((c) => c.name.toLowerCase().includes(categorySearch.toLowerCase()))
+                                .sort((a, b) => a.name.localeCompare(b.name, 'id'))
+                                .map((cat) => (
+                                  <button
+                                    key={cat.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setCategoryId(cat.id);
+                                      setIsCategoryDropdownOpen(false);
+                                      setCategorySearch('');
+                                    }}
+                                    className={`w-full px-4 py-2.5 text-left text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-900 transition-all flex justify-between items-center cursor-pointer ${
+                                      categoryId === cat.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'
+                                    }`}
+                                  >
+                                    <span>{cat.name}</span>
+                                    {categoryId === cat.id && <span className="text-indigo-600 font-bold">✓</span>}
+                                  </button>
+                                ))
+                            )}
+                          </div>
+
+                          {/* Quick Add Category Option */}
+                          <div className="p-2 border-t border-slate-100 bg-slate-50 text-center">
+                            <button
+                              type="button"
+                              onClick={handleQuickAddCategory}
+                              className="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm"
+                              id="quick-add-category-btn"
+                            >
+                              + Tambah Kategori Baru
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Add Category Button next to the input */}
+                    <button
+                      type="button"
+                      onClick={handleQuickAddCategory}
+                      className="px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer shadow-sm shadow-indigo-100 shrink-0"
+                      title="Tambah Kategori Baru"
+                      id="quick-add-category-input-btn"
+                    >
+                      <Plus className="w-4.5 h-4.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Satuan Jual */}
@@ -404,7 +640,7 @@ export default function ProductManagement({
                 id="category-filter-select"
               >
                 <option value="">Semua Kategori</option>
-                {categories.map((cat) => (
+                {[...categories].sort((a, b) => a.name.localeCompare(b.name, 'id')).map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name}
                   </option>

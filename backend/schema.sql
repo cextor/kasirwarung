@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS products (
     stock INT NOT NULL DEFAULT 0,
     unit VARCHAR(20) NOT NULL DEFAULT 'pcs',
     is_active TINYINT(1) NOT NULL DEFAULT 1,
+    status_cd ENUM('normal', 'nullified') NOT NULL DEFAULT 'normal',
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

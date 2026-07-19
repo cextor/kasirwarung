@@ -45,7 +45,7 @@ class Products extends ResourceController
     // GET /products
     public function index()
     {
-        $products = $this->model->findAll();
+        $products = $this->model->where('status_cd', 'normal')->findAll();
         $formatted = array_map([$this, 'toCamelCase'], $products);
         return $this->respond($formatted);
     }
@@ -53,7 +53,7 @@ class Products extends ResourceController
     // GET /products/(:any)
     public function show($id = null)
     {
-        $product = $this->model->find($id);
+        $product = $this->model->where('status_cd', 'normal')->find($id);
         if (!$product) {
             return $this->failNotFound('Produk tidak ditemukan');
         }
@@ -69,6 +69,22 @@ class Products extends ResourceController
         }
 
         $dbData = $this->toSnakeCase($json);
+
+        // Validation for unique name among normal products
+        if (!empty($dbData['name'])) {
+            $existingName = $this->model->where('status_cd', 'normal')->where('name', $dbData['name'])->first();
+            if ($existingName) {
+                return $this->fail('Nama produk sudah digunakan.');
+            }
+        }
+
+        // Validation for unique barcode among normal products
+        if (!empty($dbData['barcode'])) {
+            $existingBarcode = $this->model->where('status_cd', 'normal')->where('barcode', $dbData['barcode'])->first();
+            if ($existingBarcode) {
+                return $this->fail('Kode barcode sudah digunakan oleh produk: ' . $existingBarcode['name']);
+            }
+        }
 
         if (!$this->model->insert($dbData)) {
             return $this->fail($this->model->errors());
@@ -86,11 +102,33 @@ class Products extends ResourceController
             $json = $this->request->getRawInput();
         }
 
-        if (!$this->model->find($id)) {
+        if (!$this->model->where('status_cd', 'normal')->find($id)) {
             return $this->failNotFound('Produk tidak ditemukan');
         }
 
         $dbData = $this->toSnakeCase($json);
+
+        // Validation for unique name among other normal products
+        if (!empty($dbData['name'])) {
+            $existingName = $this->model->where('status_cd', 'normal')
+                                        ->where('name', $dbData['name'])
+                                        ->where('id !=', $id)
+                                        ->first();
+            if ($existingName) {
+                return $this->fail('Nama produk sudah digunakan.');
+            }
+        }
+
+        // Validation for unique barcode among other normal products
+        if (!empty($dbData['barcode'])) {
+            $existingBarcode = $this->model->where('status_cd', 'normal')
+                                           ->where('barcode', $dbData['barcode'])
+                                           ->where('id !=', $id)
+                                           ->first();
+            if ($existingBarcode) {
+                return $this->fail('Kode barcode sudah digunakan oleh produk: ' . $existingBarcode['name']);
+            }
+        }
 
         if (!$this->model->update($id, $dbData)) {
             return $this->fail($this->model->errors());
@@ -103,11 +141,12 @@ class Products extends ResourceController
     // DELETE /products/(:any)
     public function delete($id = null)
     {
-        if (!$this->model->find($id)) {
+        $product = $this->model->where('status_cd', 'normal')->find($id);
+        if (!$product) {
             return $this->failNotFound('Produk tidak ditemukan');
         }
 
-        $this->model->delete($id);
+        $this->model->update($id, ['status_cd' => 'nullified']);
         return $this->respondDeleted(['id' => $id], 'Produk berhasil dihapus');
     }
 }

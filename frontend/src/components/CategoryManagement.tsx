@@ -102,6 +102,8 @@ export default function CategoryManagement({
     });
   };
 
+  const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name, 'id'));
+
   return (
     <div className="flex flex-col gap-6" id="category-mgmt-container">
       {/* Category Form Modal */}
@@ -216,7 +218,7 @@ export default function CategoryManagement({
           <div className="space-y-3" id="categories-list-container">
             {/* Mobile Cards for Categories */}
             <div className="md:hidden space-y-3" id="categories-mobile-list">
-              {categories.map((category) => {
+              {sortedCategories.map((category) => {
                 const productCount = products.filter((p) => p.categoryId === category.id).length;
                 return (
                   <div key={category.id} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex flex-col gap-2 relative" id={`category-card-${category.id}`}>
@@ -266,7 +268,7 @@ export default function CategoryManagement({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-sm text-slate-700">
-                  {categories.map((category) => {
+                  {sortedCategories.map((category) => {
                     const productCount = products.filter((p) => p.categoryId === category.id).length;
                     return (
                       <tr key={category.id} className="hover:bg-slate-50 transition-colors" id={`category-row-${category.id}`}>

@@ -3,7 +3,7 @@ import { Product, Category, CartItem, Sale, PrinterDevice } from '../types';
 import { 
   Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, 
   CheckCircle2, Printer, X, Sparkles, Copy, AlertCircle, RefreshCw,
-  Eye, ChevronDown, ChevronUp
+  Eye, ChevronDown, ChevronUp, ArrowRight
 } from 'lucide-react';
 import { formatRupiah, formatReceiptText, generateEscPosBytes, sendToPrinter, sendToUsbPrinter } from '../utils/bluetoothPrinter';
 import Swal from 'sweetalert2';
@@ -66,6 +66,73 @@ export default function TransactionCashier({
     }
   }, []);
 
+  // Global scanner listener: capture scanned barcode outside inputs and add directly to cart
+  useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore modifier keys
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // If user is focusing on an input (like search filter or quick barcode input), do not intercept
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')
+      ) {
+        return;
+      }
+
+      const currentTime = Date.now();
+      
+      // Barcode scanner typed characters are very fast (typically < 30ms delay).
+      // If the delay is > 100ms, it is a slow manual type, so reset the buffer.
+      if (currentTime - lastKeyTime > 100) {
+        buffer = '';
+      }
+      
+      lastKeyTime = currentTime;
+
+      if (e.key === 'Enter') {
+        if (buffer.length >= 6 && /^\d+$/.test(buffer)) {
+          e.preventDefault();
+          
+          const matchedProduct = products.find(
+            (p) => p.barcode && p.barcode.trim() === buffer.trim()
+          );
+
+          if (matchedProduct) {
+            if (matchedProduct.isActive === false) {
+              setScanMessage({ text: `Gagal: Produk ${matchedProduct.name} sedang tidak aktif!`, isError: true });
+            } else if (matchedProduct.stock <= 0) {
+              setScanMessage({ text: `Gagal: Stok ${matchedProduct.name} habis!`, isError: true });
+            } else {
+              addToCart(matchedProduct);
+              setScanMessage({ text: `Berhasil menambahkan: ${matchedProduct.name}`, isError: false });
+            }
+          } else {
+            setScanMessage({ text: `Barcode "${buffer}" tidak terdaftar!`, isError: true });
+          }
+
+          buffer = '';
+          
+          // Auto clear scan message
+          setTimeout(() => {
+            setScanMessage({ text: '', isError: false });
+          }, 3000);
+        }
+      } else if (e.key.length === 1 && /^\d+$/.test(e.key)) {
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [products, cart]);
+
   // Handle direct barcode scanning input
   const handleBarcodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,33 +165,21 @@ export default function TransactionCashier({
 
   // Add Product to Cart
   const addToCart = (product: Product) => {
+    // Check if product is already in the cart
+    const isAlreadyInCart = cart.some((item) => item.product.id === product.id);
+    if (isAlreadyInCart) {
+      Swal.fire({
+        title: 'Produk Sudah di Keranjang',
+        text: `Produk "${product.name}" sudah ada di keranjang. Untuk mengubah jumlahnya, silakan sesuaikan langsung di kolom keranjang belanja.`,
+        icon: 'info',
+        confirmButtonColor: '#4f46e5'
+      });
+      return;
+    }
+
     setCart((prevCart) => {
-      const existingIndex = prevCart.findIndex((item) => item.product.id === product.id);
-
-      if (existingIndex > -1) {
-        const item = prevCart[existingIndex];
-        const newQty = item.quantity + 1;
-        
-        if (newQty > product.stock) {
-          Swal.fire({
-            title: 'Stok Tidak Cukup',
-            text: `Stok tidak mencukupi. Stok maksimal: ${product.stock}`,
-            icon: 'warning',
-            confirmButtonColor: '#4f46e5'
-          });
-          return prevCart;
-        }
-
-        const updatedCart = [...prevCart];
-        updatedCart[existingIndex] = {
-          ...item,
-          quantity: newQty,
-        };
-        return updatedCart;
-      } else {
-        // New item - starts at qty 1, defaults to retail price
-        return [...prevCart, { product, quantity: 1, priceType: 'retail' }];
-      }
+      // New item - starts at qty 1, defaults to retail price
+      return [...prevCart, { product, quantity: 1, priceType: 'retail' }];
     });
 
     // Keep scanner field focused
@@ -413,14 +468,16 @@ export default function TransactionCashier({
     window.print();
   };
 
-  // Filter catalog
-  const filteredCatalog = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (p.barcode && p.barcode.includes(searchQuery));
-    const matchesCategory = selectedCategoryId === '' || p.categoryId === selectedCategoryId;
-    const matchesActive = p.isActive !== false;
-    return matchesSearch && matchesCategory && matchesActive;
-  });
+  // Filter & Sort catalog
+  const filteredCatalog = products
+    .filter((p) => {
+      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            (p.barcode && p.barcode.includes(searchQuery));
+      const matchesCategory = selectedCategoryId === '' || p.categoryId === selectedCategoryId;
+      const matchesActive = p.isActive !== false;
+      return matchesSearch && matchesCategory && matchesActive;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'id'));
 
   return (
     <div className="space-y-4">
@@ -546,66 +603,74 @@ export default function TransactionCashier({
               <p className="text-sm">Produk tidak ditemukan.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-3 overflow-y-auto max-h-[500px] pr-1" id="catalog-grid">
+            <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[550px] pr-1" id="catalog-list">
               {filteredCatalog.map((product) => {
                 const isOutOfStock = product.stock <= 0;
-                let cardStyle = 'border-l-4 border-l-indigo-500 bg-gradient-to-br from-indigo-50/20 to-white hover:border-indigo-500 hover:shadow-md';
-                if (!isOutOfStock) {
-                  if (product.categoryId === 'cat-sembako') {
-                    cardStyle = 'border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50/20 to-white hover:border-emerald-500 hover:shadow-md';
-                  } else if (product.categoryId === 'cat-mie') {
-                    cardStyle = 'border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50/20 to-white hover:border-amber-500 hover:shadow-md';
-                  } else if (product.categoryId === 'cat-minuman') {
-                    cardStyle = 'border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-50/20 to-white hover:border-sky-500 hover:shadow-md';
-                  } else if (product.categoryId === 'cat-snack') {
-                    cardStyle = 'border-l-4 border-l-rose-500 bg-gradient-to-br from-rose-50/20 to-white hover:border-rose-500 hover:shadow-md';
-                  }
-                } else {
-                  cardStyle = 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed';
-                }
+                const cardStyle = isOutOfStock
+                  ? 'bg-slate-300/40 border-slate-300/50 opacity-60 cursor-not-allowed'
+                  : 'bg-slate-200/80 hover:bg-indigo-100/80 border-slate-300/80 hover:border-indigo-400/80 hover:shadow-md';
 
                 return (
-                  <button
+                  <div
                     key={product.id}
-                    disabled={isOutOfStock}
-                    onClick={() => addToCart(product)}
-                    className={`p-3.5 rounded-xl border border-slate-100 shadow-sm text-left flex flex-col justify-between transition-all h-36 relative overflow-hidden group cursor-pointer ${cardStyle}`}
+                    onClick={() => !isOutOfStock && addToCart(product)}
+                    onKeyDown={(e) => {
+                      if (!isOutOfStock && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        addToCart(product);
+                      }
+                    }}
+                    tabIndex={isOutOfStock ? -1 : 0}
+                    role="button"
+                    aria-disabled={isOutOfStock}
+                    className={`py-7 px-4 w-full rounded-xl border shadow-sm text-left flex flex-row items-center justify-between gap-4 transition-all duration-200 relative overflow-hidden group select-none ${
+                      isOutOfStock ? 'bg-slate-100/50 border-slate-200/80 opacity-65 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.005] hover:-translate-y-0.5 ' + cardStyle
+                    }`}
                     id={`catalog-item-${product.id}`}
                   >
-                    <div>
-                      {/* Name */}
-                      <h4 className="font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-indigo-700 transition-colors">
-                        {product.name}
-                      </h4>
-                      {/* Subtitle / Unit & Stock inline to avoid overlapping */}
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[10px] uppercase font-semibold text-slate-400">
-                          {product.unit}
-                        </span>
-                        <span className="text-[10px] text-slate-300">•</span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-                          product.stock <= 0
-                            ? 'bg-red-100 text-red-700'
-                            : product.stock <= 5
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          Stok: {product.stock}
-                        </span>
+                    {/* Inner content wrapper (takes all available width) */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between gap-0 pt-0.5">
+                      {/* Baris 1: Nama Produk & Harga Eceran */}
+                      <div className="flex justify-between items-baseline gap-4">
+                        <h4 className="font-extrabold text-slate-800 line-clamp-1 text-sm sm:text-base group-hover:text-indigo-700 transition-colors">
+                          {product.name}
+                        </h4>
+                        <div className="text-sm sm:text-base font-black text-slate-900 shrink-0">
+                          {formatRupiah(product.priceRetail)}
+                        </div>
+                      </div>
+
+                      {/* Baris 2: Satuan & Stok & Harga Grosir */}
+                      <div className="flex justify-between items-center gap-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                            {product.unit}
+                          </span>
+                          <span className="text-[10px] text-slate-300">•</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
+                            product.stock <= 0
+                              ? 'bg-red-50 text-red-700 border border-red-100'
+                              : product.stock <= 5
+                              ? 'bg-amber-50 text-amber-700 border border-amber-100 animate-pulse'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            Stok: {product.stock}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 shrink-0">
+                          <span className="text-slate-400 font-medium">Grosir:</span>
+                          <span>{formatRupiah(product.priceWholesale)}</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="mt-3">
-                      {/* Prices */}
-                      <div className="text-sm font-extrabold text-slate-900">
-                        {formatRupiah(product.priceRetail)}
+                    {/* Tombol Panah Hijau Emerald */}
+                    {!isOutOfStock && (
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100/70 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 flex items-center justify-center transition-all duration-200 shadow-sm shrink-0">
+                        <ArrowRight className="w-4 h-4 font-bold" />
                       </div>
-                      <div className="text-[10px] text-indigo-600 font-semibold flex items-center gap-0.5 mt-0.5">
-                        <span>Grosir:</span>
-                        <span>{formatRupiah(product.priceWholesale)}</span>
-                      </div>
-                    </div>
-                  </button>
+                    )}
+                  </div>
                 );
               })}
             </div>

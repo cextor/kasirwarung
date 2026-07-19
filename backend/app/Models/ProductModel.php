@@ -13,7 +13,7 @@ class ProductModel extends Model
     protected $protectFields    = true;
     protected $allowedFields    = [
         'id', 'name', 'barcode', 'category_id', 'price_retail', 
-        'price_wholesale', 'wholesale_min_qty', 'stock', 'unit', 'is_active'
+        'price_wholesale', 'wholesale_min_qty', 'stock', 'unit', 'is_active', 'status_cd'
     ];
 
     // Validation
@@ -27,6 +27,7 @@ class ProductModel extends Model
         'stock'             => 'required|integer',
         'unit'              => 'required|max_length[20]',
         'is_active'         => 'permit_empty|in_list[0,1]',
+        'status_cd'         => 'permit_empty|in_list[normal,nullified]',
     ];
     protected $validationMessages   = [];
     protected $skipValidation       = false;

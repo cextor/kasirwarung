@@ -96,6 +96,7 @@ export default function App() {
         confirmButtonColor: '#4f46e5',
         timer: 1500
       });
+      return created;
     } catch (err: any) {
       Swal.fire({ title: 'Gagal!', text: 'Gagal menambah kategori: ' + err.message, icon: 'error', confirmButtonColor: '#4f46e5' });
     }
@@ -441,6 +442,7 @@ export default function App() {
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
+            onAddCategory={handleAddCategory}
           />
         );
       case 'categories':
