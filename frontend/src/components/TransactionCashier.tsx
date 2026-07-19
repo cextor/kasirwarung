@@ -44,9 +44,7 @@ export default function TransactionCashier({
   const [isPrintingSaleId, setIsPrintingSaleId] = useState<string | null>(null);
   
   // Barcode quick scan state
-  const [barcodeInput, setBarcodeInput] = useState('');
   const [scanMessage, setScanMessage] = useState({ text: '', isError: false });
-  const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   // Payment modal state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -58,13 +56,6 @@ export default function TransactionCashier({
   const [isPrinting, setIsPrinting] = useState(false);
   const [printError, setPrintError] = useState('');
   const [copiedReceipt, setCopiedReceipt] = useState(false);
-
-  // Focus barcode input on mount
-  useEffect(() => {
-    if (barcodeInputRef.current) {
-      barcodeInputRef.current.focus();
-    }
-  }, []);
 
   // Global scanner listener: capture scanned barcode outside inputs and add directly to cart
   useEffect(() => {
@@ -133,35 +124,7 @@ export default function TransactionCashier({
     };
   }, [products, cart]);
 
-  // Handle direct barcode scanning input
-  const handleBarcodeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!barcodeInput.trim()) return;
 
-    const matchedProduct = products.find(
-      (p) => p.barcode && p.barcode.trim() === barcodeInput.trim()
-    );
-
-    if (matchedProduct) {
-      if (matchedProduct.isActive === false) {
-        setScanMessage({ text: `Gagal: Produk ${matchedProduct.name} sedang tidak aktif!`, isError: true });
-      } else if (matchedProduct.stock <= 0) {
-        setScanMessage({ text: `Gagal: Stok ${matchedProduct.name} habis!`, isError: true });
-      } else {
-        addToCart(matchedProduct);
-        setScanMessage({ text: `Berhasil menambahkan: ${matchedProduct.name}`, isError: false });
-      }
-    } else {
-      setScanMessage({ text: `Barcode "${barcodeInput}" tidak terdaftar!`, isError: true });
-    }
-
-    setBarcodeInput('');
-    
-    // Auto clear scan feedback after 3s
-    setTimeout(() => {
-      setScanMessage({ text: '', isError: false });
-    }, 3000);
-  };
 
   // Add Product to Cart
   const addToCart = (product: Product) => {
@@ -181,11 +144,6 @@ export default function TransactionCashier({
       // New item - starts at qty 1, defaults to retail price
       return [...prevCart, { product, quantity: 1, priceType: 'retail' }];
     });
-
-    // Keep scanner field focused
-    if (barcodeInputRef.current) {
-      barcodeInputRef.current.focus();
-    }
   };
 
   // Remove / decrement qty in cart
@@ -511,41 +469,41 @@ export default function TransactionCashier({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full items-start" id="cashier-layout">
         {/* LEFT PANEL: Catalog Selection (7 cols on lg) */}
         <div className={`lg:col-span-7 space-y-4 ${mobileTab === 'catalog' ? 'block' : 'hidden lg:block'}`} id="cashier-left-panel">
-        {/* Quick Barcode Scanner Form */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm" id="barcode-scan-panel">
-          <form onSubmit={handleBarcodeSubmit} className="flex gap-2 items-center">
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-3.5 text-[10px] font-bold text-slate-400 font-sans tracking-wider uppercase">
-                Barcode:
-              </span>
-              <input
-                ref={barcodeInputRef}
-                type="text"
-                className="w-full pl-20 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono font-semibold text-sm"
-                placeholder="Arahkan scanner / ketik barcode & tekan Enter..."
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                id="barcode-quick-input"
-              />
+        {/* Scanner Active Guide Banner */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-900 to-indigo-950 text-white p-5 rounded-2xl border border-indigo-950 shadow-md shadow-indigo-950/10 flex items-center gap-4.5 min-h-[105px] group" id="barcode-scan-panel">
+          <div className="flex flex-col gap-2 flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              {/* Active Pulse green light */}
+              <div className="flex items-center gap-1.5 bg-indigo-950/50 px-2.5 py-1 rounded-full border border-indigo-800/40 shrink-0">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Scanner Aktif & Siap</span>
+              </div>
             </div>
-            <button
-              type="submit"
-              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition-all text-sm cursor-pointer shadow-sm shadow-indigo-100"
-              id="quick-scan-submit"
-            >
-              Cari
-            </button>
-          </form>
+            <p className="text-xs text-indigo-100 leading-relaxed font-semibold text-pretty">
+              Silakan <strong className="text-emerald-400 underline decoration-emerald-400/30 underline-offset-2 font-black">langsung scan barcode produk</strong> di halaman ini atau <strong className="text-emerald-400 underline decoration-emerald-400/30 underline-offset-2 font-black">klik/pilih/tekan nama produk</strong> di daftar produk di bawah. Produk otomatis masuk ke keranjang. Tentukan jumlah & tipe harga langsung di kolom keranjang belanja.
+            </p>
+          </div>
 
+          {/* Interactive Scan Sparkles Box */}
+          <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-800/30 border border-indigo-700/30 text-indigo-300 shadow-inner shrink-0 group-hover:scale-105 transition-all">
+            <Sparkles className="w-5 h-5 text-indigo-300 animate-pulse" />
+          </div>
+
+          {/* Toast Scan Overlay inside Card */}
           {scanMessage.text && (
             <div 
-              className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                scanMessage.isError ? 'bg-red-50 text-red-700' : 'bg-indigo-50 text-indigo-700'
+              className={`absolute inset-0 flex items-center justify-center p-4 backdrop-blur-md rounded-2xl transition-all duration-300 ${
+                scanMessage.isError ? 'bg-red-950/90 text-red-100' : 'bg-indigo-950/90 text-indigo-100'
               }`}
               id="scan-message"
             >
-              <AlertCircle className="w-3.5 h-3.5" />
-              <span>{scanMessage.text}</span>
+              <div className="flex items-center gap-1.5 text-center flex-col animate-bounce">
+                <AlertCircle className={`w-7 h-7 ${scanMessage.isError ? 'text-red-400' : 'text-indigo-400'}`} />
+                <span className="font-extrabold text-sm">{scanMessage.text}</span>
+              </div>
             </div>
           )}
         </div>

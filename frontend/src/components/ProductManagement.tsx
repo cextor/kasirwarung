@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Product, Category } from '../types';
-import { Plus, Trash2, Edit2, ShoppingBag, Search, Filter, RefreshCcw, Tag, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, ShoppingBag, Search, Filter, RefreshCcw, Tag, X, Sparkles } from 'lucide-react';
 import { formatRupiah } from '../utils/bluetoothPrinter';
 import Swal from 'sweetalert2';
 
@@ -590,6 +590,30 @@ export default function ProductManagement({
           </div>
         </div>
       )}
+
+      {/* Auto-Scan Active Guide Banner */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-900 to-indigo-950 text-white p-5 rounded-2xl border border-indigo-950 shadow-md shadow-indigo-950/10 flex items-center gap-4.5 min-h-[90px] group animate-fade-in" id="catalog-autoscan-banner">
+        <div className="flex flex-col gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            {/* Active Pulse green light */}
+            <div className="flex items-center gap-1.5 bg-indigo-950/50 px-2.5 py-1 rounded-full border border-indigo-800/40 shrink-0">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Auto-Scan Aktif</span>
+            </div>
+          </div>
+          <p className="text-xs text-indigo-100 leading-relaxed font-semibold text-pretty">
+            Anda dapat <strong className="text-emerald-400 underline decoration-emerald-400/30 underline-offset-2 font-black">langsung scan barcode produk</strong> yang ingin ditambah di halaman ini agar form tambah produk otomatis muncul tanpa menekan tombol tambah produk.
+          </p>
+        </div>
+
+        {/* Interactive Sparkles Box */}
+        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-800/30 border border-indigo-700/30 text-indigo-300 shadow-inner shrink-0 group-hover:scale-105 transition-all">
+          <Sparkles className="w-5 h-5 text-indigo-300 animate-pulse" />
+        </div>
+      </div>
 
       {/* Product List Panel */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden" id="product-list-panel">
