@@ -129,6 +129,26 @@ export default function ProductManagement({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('');
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  
+  // Select2 replica states for catalog category filter
+  const [isFilterCategoryDropdownOpen, setIsFilterCategoryDropdownOpen] = useState(false);
+  const [filterCategorySearch, setFilterCategorySearch] = useState('');
+  const filterCategoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close filter category dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        filterCategoryDropdownRef.current &&
+        !filterCategoryDropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsFilterCategoryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   // Submit Handler
   const handleSubmit = (e: React.FormEvent) => {
@@ -303,12 +323,17 @@ export default function ProductManagement({
       
       let matchesStock = true;
       if (stockFilter === 'low') {
-        matchesStock = product.stock > 0 && product.stock <= 5;
+        matchesStock = product.stock > 0 && product.stock < 15;
       } else if (stockFilter === 'out') {
         matchesStock = product.stock === 0;
       }
 
-      return matchesSearch && matchesCategory && matchesStock;
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && product.isActive !== false) ||
+        (statusFilter === 'inactive' && product.isActive === false);
+      
+      return matchesSearch && matchesCategory && matchesStock && matchesStatus;
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'id'));
 
@@ -641,13 +666,19 @@ export default function ProductManagement({
         {/* Body */}
         <div className="p-6 flex flex-col gap-6" id="product-list-body">
           {/* Filter Bar */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3" id="filters-grid">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center" id="filters-grid">
             {/* Search Input */}
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+              <Search className={`absolute left-3 top-2.5 w-4 h-4 transition-colors ${
+                searchQuery ? 'text-indigo-600 font-bold' : 'text-slate-400'
+              }`} />
               <input
                 type="text"
-                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
+                className={`w-full pl-9 pr-4 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${
+                  searchQuery
+                    ? 'border-indigo-400 bg-indigo-50/20 text-indigo-900 font-semibold'
+                    : 'border-slate-200 text-slate-800 bg-white'
+                }`}
                 placeholder="Cari nama / barcode..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -655,30 +686,142 @@ export default function ProductManagement({
               />
             </div>
 
-            {/* Category Filter */}
-            <div className="relative">
-              <select
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 bg-white"
-                value={selectedCategoryFilter}
-                onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                id="category-filter-select"
+            {/* Category Filter (Select2 replica) */}
+            <div className="relative" ref={filterCategoryDropdownRef} id="category-filter-select2-container">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFilterCategoryDropdownOpen(!isFilterCategoryDropdownOpen);
+                  setFilterCategorySearch('');
+                }}
+                className={`w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all flex justify-between items-center text-left text-sm cursor-pointer ${
+                  selectedCategoryFilter
+                    ? 'border-indigo-400 bg-indigo-50/20 text-indigo-900 font-bold shadow-sm'
+                    : 'border-slate-200 text-slate-800 bg-white'
+                }`}
+                id="category-filter-select2-btn"
               >
-                <option value="">Semua Kategori</option>
-                {[...categories].sort((a, b) => a.name.localeCompare(b.name, 'id')).map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                <span className={selectedCategoryFilter ? 'text-indigo-900 font-bold' : 'text-slate-400'}>
+                  {categories.find((c) => c.id === selectedCategoryFilter)?.name || 'Semua Kategori'}
+                </span>
+                <span className={`text-xs transition-colors ${selectedCategoryFilter ? 'text-indigo-600' : 'text-slate-400'}`}>▼</span>
+              </button>
+
+              {isFilterCategoryDropdownOpen && (
+                <div className="absolute z-30 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-72 animate-fade-in">
+                  {/* Search input */}
+                  <div className="p-2 border-b border-slate-100 bg-slate-50">
+                    <input
+                      type="text"
+                      className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
+                      placeholder="Cari kategori..."
+                      value={filterCategorySearch}
+                      onChange={(e) => setFilterCategorySearch(e.target.value)}
+                      autoFocus
+                      id="filter-select2-search-input"
+                    />
+                  </div>
+                  {/* Categories List */}
+                  <div className="overflow-y-auto max-h-48">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategoryFilter('');
+                        setIsFilterCategoryDropdownOpen(false);
+                        setFilterCategorySearch('');
+                      }}
+                      className={`w-full px-4 py-2 text-left text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-900 transition-all flex justify-between items-center cursor-pointer ${
+                        selectedCategoryFilter === '' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700'
+                      }`}
+                    >
+                      <span>Semua Kategori</span>
+                      {selectedCategoryFilter === '' && <span className="text-indigo-600 font-bold">✓</span>}
+                    </button>
+                    {categories.filter((c) => c.name.toLowerCase().includes(filterCategorySearch.toLowerCase())).length > 0 ? (
+                      [...categories]
+                        .sort((a, b) => a.name.localeCompare(b.name, 'id'))
+                        .filter((c) => c.name.toLowerCase().includes(filterCategorySearch.toLowerCase()))
+                        .map((cat) => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategoryFilter(cat.id);
+                              setIsFilterCategoryDropdownOpen(false);
+                              setFilterCategorySearch('');
+                            }}
+                            className={`w-full px-4 py-2 text-left text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-900 transition-all flex justify-between items-center cursor-pointer ${
+                              selectedCategoryFilter === cat.id ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700'
+                            }`}
+                          >
+                            <span>{cat.name}</span>
+                            {selectedCategoryFilter === cat.id && <span className="text-indigo-600 font-bold">✓</span>}
+                          </button>
+                        ))
+                    ) : (
+                      filterCategorySearch && (
+                        <div className="p-3 text-center text-xs text-slate-400">Kategori tidak ditemukan</div>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex p-1 rounded-xl border transition-all bg-indigo-50/20 border-indigo-400 shadow-sm shadow-indigo-100/30" id="status-filter-tabs">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  statusFilter === 'all'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                id="status-filter-all"
+              >
+                Semua Status
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('active')}
+                className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  statusFilter === 'active'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-emerald-600'
+                }`}
+                id="status-filter-active"
+              >
+                Aktif
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('inactive')}
+                className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  statusFilter === 'inactive'
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-red-650'
+                }`}
+                id="status-filter-inactive"
+              >
+                Nonaktif
+              </button>
             </div>
 
             {/* Stock status filter */}
-            <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100" id="stock-filter-tabs">
+            <div className={`flex p-1 rounded-xl border transition-all ${
+              stockFilter === 'low'
+                ? 'bg-amber-50/20 border-amber-400 shadow-sm shadow-amber-100/30'
+                : stockFilter === 'out'
+                ? 'bg-red-50/20 border-red-400 shadow-sm shadow-red-100/30'
+                : 'bg-indigo-50/20 border-indigo-400 shadow-sm shadow-indigo-100/30'
+            }`} id="stock-filter-tabs">
               <button
+                type="button"
                 onClick={() => setStockFilter('all')}
-                className={`flex-1 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   stockFilter === 'all'
-                    ? 'bg-white text-slate-800 shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
                 id="stock-filter-all"
@@ -686,21 +829,23 @@ export default function ProductManagement({
                 Semua
               </button>
               <button
+                type="button"
                 onClick={() => setStockFilter('low')}
-                className={`flex-1 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   stockFilter === 'low'
                     ? 'bg-amber-500 text-white shadow-sm'
                     : 'text-slate-500 hover:text-amber-600'
                 }`}
                 id="stock-filter-low"
               >
-                Stok Tipis (≤5)
+                Stok Tipis (&lt;15)
               </button>
               <button
+                type="button"
                 onClick={() => setStockFilter('out')}
-                className={`flex-1 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   stockFilter === 'out'
-                    ? 'bg-red-500 text-white shadow-sm'
+                    ? 'bg-red-600 text-white shadow-sm'
                     : 'text-slate-500 hover:text-red-600'
                 }`}
                 id="stock-filter-out"
@@ -726,7 +871,7 @@ export default function ProductManagement({
                 let stockColor = 'bg-slate-100 text-slate-700';
                 if (product.stock === 0) {
                   stockColor = 'bg-red-50 text-red-700 font-semibold border border-red-100';
-                } else if (product.stock <= 5) {
+                } else if (product.stock < 15) {
                   stockColor = 'bg-amber-50 text-amber-700 font-semibold border border-amber-100';
                 }
 
@@ -774,7 +919,7 @@ export default function ProductManagement({
                           className={`px-2 py-0.5 rounded text-[10px] font-extrabold transition-all cursor-pointer ${
                             product.isActive !== false
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                              : 'bg-slate-100 text-slate-400 line-through border border-slate-200'
+                              : 'bg-red-50 text-red-600 line-through border border-red-200 font-extrabold'
                           }`}
                           title="Klik untuk mengubah status aktif"
                           id={`status-toggle-mobile-btn-${product.id}`}
@@ -789,22 +934,22 @@ export default function ProductManagement({
                     </div>
 
                     {/* Absolute positioning of action buttons in the corner */}
-                    <div className="absolute right-3 top-3 flex items-center gap-0.5">
+                    <div className="absolute right-3 top-3 flex items-center gap-1.5">
                       <button
                         onClick={() => handleEdit(product)}
-                        className="p-2 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 hover:text-amber-800 rounded-lg border border-amber-100/50 transition-colors cursor-pointer"
                         title="Edit Produk"
                         id={`edit-product-mobile-btn-${product.id}`}
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(product.id)}
-                        className="p-2 hover:bg-slate-100 text-slate-500 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 rounded-lg border border-red-100/50 transition-colors cursor-pointer"
                         title="Hapus Produk"
                         id={`delete-product-mobile-btn-${product.id}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -833,7 +978,7 @@ export default function ProductManagement({
                     let stockColor = 'bg-slate-100 text-slate-700';
                     if (product.stock === 0) {
                       stockColor = 'bg-red-50 text-red-700 font-semibold';
-                    } else if (product.stock <= 5) {
+                    } else if (product.stock < 15) {
                       stockColor = 'bg-amber-50 text-amber-700 font-semibold';
                     }
 
@@ -871,7 +1016,7 @@ export default function ProductManagement({
                             className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-all hover:scale-105 ${
                               product.isActive !== false
                                 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-400 line-through hover:bg-slate-200 border border-slate-200'
+                                : 'bg-red-50 text-red-600 line-through hover:bg-red-100 border border-red-200 font-extrabold'
                             }`}
                             title="Klik untuk mengubah status aktif"
                             id={`status-toggle-btn-${product.id}`}
@@ -880,10 +1025,10 @@ export default function ProductManagement({
                           </button>
                         </td>
                         <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => handleEdit(product)}
-                              className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 hover:text-amber-800 rounded-lg border border-amber-100/50 transition-colors cursor-pointer"
                               title="Edit Produk"
                               id={`edit-product-btn-${product.id}`}
                             >
@@ -891,7 +1036,7 @@ export default function ProductManagement({
                             </button>
                             <button
                               onClick={() => handleDelete(product.id)}
-                              className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 rounded-lg border border-red-100/50 transition-colors cursor-pointer"
                               title="Hapus Produk"
                               id={`delete-product-btn-${product.id}`}
                             >
