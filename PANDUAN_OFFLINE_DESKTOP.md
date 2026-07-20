@@ -68,3 +68,31 @@ Mulai sekarang, ketika Anda ingin membuka aplikasi kasir toko Anda:
 4. Browser Google Chrome atau browser default Anda akan otomatis terbuka dan langsung menampilkan halaman aplikasi kasir siap pakai di alamat:
    http://localhost/kasirwarung/backend/public/
 5. Anda siap melakukan transaksi scan barcode atau kelola katalog produk!
+
+---
+
+## 🔍 Troubleshooting (Pecahkan Masalah & Solusi Error)
+
+### 1. Error Printer USB: `Access Denied` / `Failed to execute 'open' on 'USBDevice'`
+* **Mengapa ini terjadi?**
+  Windows secara bawaan mengunci perangkat printer USB untuk digunakan oleh sistem pencetakan Windows sendiri (driver `usbprint.sys`). Hal ini membuat browser (Chrome/Edge) tidak diberi izin akses langsung.
+* **Cara Mengatasinya (Sangat Mudah)**:
+  1. Unduh aplikasi gratis **Zadig** di: [https://zadig.akeo.ie/](https://zadig.akeo.ie/)
+  2. Pastikan Printer Thermal Anda tersambung ke komputer via kabel USB dan dalam kondisi menyala.
+  3. Buka aplikasi **Zadig**, pilih menu **Options** -> centang **List All Devices**.
+  4. Pada kolom pilihan (dropdown), pilih nama printer Anda (misalnya: *POS-58, Thermal Printer, atau USB Printing Support*).
+  5. Di sebelah kanan anak panah hijau, pastikan driver tujuan yang dipilih adalah **`WinUSB`**.
+  6. Klik tombol besar **Replace Driver** (atau **Install Driver**). Tunggu hingga proses selesai.
+  7. Buka kembali aplikasi kasir Anda di Chrome, klik Hubungkan Printer USB, dan printer akan langsung terhubung tanpa error!
+
+### 2. Error Konsol: `GET http://localhost:8080/index.php?debugbar net::ERR_CONNECTION_REFUSED`
+* **Mengapa ini terjadi?**
+  Aplikasi masih berjalan dalam mode Pengembangan (*Development*). Fitur Toolbar Debugging mencari port 8080.
+* **Cara Mengatasinya**:
+  1. Masuk ke folder `[DRIVE_XAMPP]:\xampp\htdocs\kasirwarung\backend`.
+  2. Buka file **`.env`** dengan Notepad.
+  3. Cari baris `CI_ENVIRONMENT` dan ubah nilainya menjadi `production`:
+     ```env
+     CI_ENVIRONMENT = production
+     ```
+  4. Simpan file (**Ctrl + S**). Toolbar debug akan mati otomatis, mempercepat loading, dan menghilangkan error tersebut.
