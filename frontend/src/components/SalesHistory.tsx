@@ -63,17 +63,11 @@ export default function SalesHistory({
     return matchesDate && matchesSearch;
   }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  // Statistics calculation ONLY for today's sales
-  const todayStr = getLocalDateString();
-  const todaySales = sales.filter((sale) => {
-    const saleDate = getLocalDateString(new Date(sale.timestamp));
-    return saleDate === todayStr;
-  });
-
-  const totalRevenue = todaySales.reduce((sum, s) => sum + s.totalAmount, 0);
-  const totalTransactions = todaySales.length;
+  // Statistics calculation for filtered list
+  const totalRevenue = filteredSales.reduce((sum, s) => sum + s.totalAmount, 0);
+  const totalTransactions = filteredSales.length;
   const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
-  const totalItemsSold = todaySales.reduce((sum, s) => sum + s.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
+  const totalItemsSold = filteredSales.reduce((sum, s) => sum + s.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
 
   // Toggle detail rows
   const toggleExpandSale = (id: string) => {
@@ -156,7 +150,7 @@ export default function SalesHistory({
           </div>
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-              Omset Hari Ini
+              Omset Penjualan
             </span>
             <span className="text-lg font-black text-indigo-600" id="stats-revenue">
               {formatRupiah(totalRevenue)}
@@ -171,7 +165,7 @@ export default function SalesHistory({
           </div>
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-              Transaksi Hari Ini
+              Total Transaksi
             </span>
             <span className="text-lg font-black text-blue-600" id="stats-transactions">
               {totalTransactions} Nota
@@ -186,7 +180,7 @@ export default function SalesHistory({
           </div>
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-              Rerata Belanja Hari Ini
+              Rerata Belanja
             </span>
             <span className="text-lg font-black text-violet-600" id="stats-average">
               {formatRupiah(averageTransaction)}
@@ -201,7 +195,7 @@ export default function SalesHistory({
           </div>
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-              Barang Terjual Hari Ini
+              Barang Terjual
             </span>
             <span className="text-lg font-black text-amber-600" id="stats-items-sold">
               {totalItemsSold} Unit
