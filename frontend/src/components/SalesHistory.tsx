@@ -27,7 +27,16 @@ export default function SalesHistory({
   shopAddress,
 }: SalesHistoryProps) {
   // Filters
-  const [selectedDate, setSelectedDate] = useState<string>(''); // empty means all-time
+  // Helper function to get YYYY-MM-DD local date string (timezone-safe)
+  const getLocalDateString = (d: Date = new Date()) => {
+    const offset = d.getTimezoneOffset();
+    const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+  };
+
+  // Filters (Date Range)
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   
@@ -36,9 +45,17 @@ export default function SalesHistory({
 
   // Filter Sales Logic
   const filteredSales = sales.filter((sale) => {
-    // Date match
-    const saleDate = new Date(sale.timestamp).toISOString().split('T')[0];
-    const matchesDate = selectedDate === '' || saleDate === selectedDate;
+    // Date range match
+    const saleDate = getLocalDateString(new Date(sale.timestamp));
+    
+    let matchesDate = true;
+    if (startDate && endDate) {
+      matchesDate = saleDate >= startDate && saleDate <= endDate;
+    } else if (startDate) {
+      matchesDate = saleDate >= startDate;
+    } else if (endDate) {
+      matchesDate = saleDate <= endDate;
+    }
 
     // Search query match (invoice number)
     const matchesSearch = sale.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase());
@@ -46,11 +63,17 @@ export default function SalesHistory({
     return matchesDate && matchesSearch;
   }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  // Statistics calculation for filtered list
-  const totalRevenue = filteredSales.reduce((sum, s) => sum + s.totalAmount, 0);
-  const totalTransactions = filteredSales.length;
+  // Statistics calculation ONLY for today's sales
+  const todayStr = getLocalDateString();
+  const todaySales = sales.filter((sale) => {
+    const saleDate = getLocalDateString(new Date(sale.timestamp));
+    return saleDate === todayStr;
+  });
+
+  const totalRevenue = todaySales.reduce((sum, s) => sum + s.totalAmount, 0);
+  const totalTransactions = todaySales.length;
   const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
-  const totalItemsSold = filteredSales.reduce((sum, s) => sum + s.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
+  const totalItemsSold = todaySales.reduce((sum, s) => sum + s.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
 
   // Toggle detail rows
   const toggleExpandSale = (id: string) => {
@@ -112,12 +135,14 @@ export default function SalesHistory({
 
   // Set date filter helpers
   const setTodayFilter = () => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    setSelectedDate(todayStr);
+    const todayStr = getLocalDateString();
+    setStartDate(todayStr);
+    setEndDate(todayStr);
   };
 
   const clearDateFilter = () => {
-    setSelectedDate('');
+    setStartDate('');
+    setEndDate('');
   };
 
   return (
@@ -126,14 +151,14 @@ export default function SalesHistory({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4" id="sales-stats-cards">
         {/* Revenue */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+          <div className="p-3 bg-indigo-50/80 text-indigo-600 rounded-xl">
             <DollarSign className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-              Omset Penjualan
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+              Omset Hari Ini
             </span>
-            <span className="text-lg font-black text-slate-800" id="stats-revenue">
+            <span className="text-lg font-black text-indigo-600" id="stats-revenue">
               {formatRupiah(totalRevenue)}
             </span>
           </div>
@@ -141,14 +166,14 @@ export default function SalesHistory({
 
         {/* Transactions count */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+          <div className="p-3 bg-blue-50/80 text-blue-600 rounded-xl">
             <TrendingUp className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-              Total Transaksi
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+              Transaksi Hari Ini
             </span>
-            <span className="text-lg font-black text-slate-800" id="stats-transactions">
+            <span className="text-lg font-black text-blue-600" id="stats-transactions">
               {totalTransactions} Nota
             </span>
           </div>
@@ -156,14 +181,14 @@ export default function SalesHistory({
 
         {/* Average transaction amount */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-violet-50 text-violet-600 rounded-xl">
+          <div className="p-3 bg-violet-50/80 text-violet-600 rounded-xl">
             <ShoppingCart className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-              Rerata Belanja
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+              Rerata Belanja Hari Ini
             </span>
-            <span className="text-lg font-black text-slate-800" id="stats-average">
+            <span className="text-lg font-black text-violet-600" id="stats-average">
               {formatRupiah(averageTransaction)}
             </span>
           </div>
@@ -171,14 +196,14 @@ export default function SalesHistory({
 
         {/* Items Sold count */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+          <div className="p-3 bg-amber-50/80 text-amber-600 rounded-xl">
             <CalendarRange className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-              Barang Terjual
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+              Barang Terjual Hari Ini
             </span>
-            <span className="text-lg font-black text-slate-800" id="stats-items-sold">
+            <span className="text-lg font-black text-amber-600" id="stats-items-sold">
               {totalItemsSold} Unit
             </span>
           </div>
@@ -210,35 +235,54 @@ export default function SalesHistory({
               />
             </div>
 
-            {/* Date Picker Input */}
-            <div className="flex items-center gap-1.5">
-              <div className="relative">
-                <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                <input
-                  type="date"
-                  className="pl-9 pr-4 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  id="date-filter-picker"
-                />
+            {/* Date Range Picker Input */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Calendar className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="date"
+                    className="pl-8 pr-2 py-1.5 text-[11px] border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    id="date-filter-start"
+                    placeholder="Mulai"
+                  />
+                </div>
+                <span className="text-[10px] font-bold text-slate-450">s/d</span>
+                <div className="relative flex-1">
+                  <Calendar className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="date"
+                    className="pl-8 pr-2 py-1.5 text-[11px] border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    id="date-filter-end"
+                    placeholder="Selesai"
+                  />
+                </div>
               </div>
-              <button
-                onClick={setTodayFilter}
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                id="btn-filter-today"
-              >
-                Hari Ini
-              </button>
-              {selectedDate && (
+              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={clearDateFilter}
-                  className="px-2 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                  id="btn-clear-date-filter"
-                  title="Bersihkan Tanggal"
+                  type="button"
+                  onClick={setTodayFilter}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  id="btn-filter-today"
                 >
-                  Semua
+                  Hari Ini
                 </button>
-              )}
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={clearDateFilter}
+                    className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    id="btn-clear-date-filter"
+                    title="Bersihkan Filter Tanggal"
+                  >
+                    Semua
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

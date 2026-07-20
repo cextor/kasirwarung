@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PrinterDevice } from '../types';
 import { 
   Printer, Wifi, WifiOff, Settings, MapPin, Store, HelpCircle, 
@@ -33,6 +33,37 @@ export default function BluetoothPrinterConnector({
   const [isTestPrinting, setIsTestPrinting] = useState(false);
   const [testError, setTestError] = useState('');
   const [testSuccess, setTestSuccess] = useState(false);
+
+  // Local settings states to prevent auto-saving on every keystroke
+  const [localShopName, setLocalShopName] = useState(shopName);
+  const [localShopAddress, setLocalShopAddress] = useState(shopAddress);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Keep local state in sync when database values load
+  useEffect(() => {
+    setLocalShopName(shopName);
+  }, [shopName]);
+
+  useEffect(() => {
+    setLocalShopAddress(shopAddress);
+  }, [shopAddress]);
+
+  const handleSaveSettings = async () => {
+    if (!localShopName.trim()) return;
+    setIsSavingSettings(true);
+    setSaveSuccess(false);
+    try {
+      await setShopName(localShopName);
+      await setShopAddress(localShopAddress);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const handleTestPrint = async () => {
     if (!activePrinter) return;
@@ -212,8 +243,8 @@ export default function BluetoothPrinterConnector({
                 type="text"
                 className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-bold"
                 placeholder="Contoh: WARUNG SEJAHTERA"
-                value={shopName}
-                onChange={(e) => setShopName(e.target.value)}
+                value={localShopName}
+                onChange={(e) => setLocalShopName(e.target.value)}
                 id="setting-shop-name"
               />
             </div>
@@ -233,8 +264,8 @@ export default function BluetoothPrinterConnector({
                 type="text"
                 className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
                 placeholder="Contoh: Jl. Raya Kali No. 12 • Telp 0812345"
-                value={shopAddress}
-                onChange={(e) => setShopAddress(e.target.value)}
+                value={localShopAddress}
+                onChange={(e) => setLocalShopAddress(e.target.value)}
                 id="setting-shop-address"
               />
             </div>
@@ -242,6 +273,29 @@ export default function BluetoothPrinterConnector({
               Informasi alamat atau nomor kontak warung yang dicantumkan di bawah nama toko.
             </span>
           </div>
+
+          {/* Manual Save Button */}
+          <button
+            type="button"
+            onClick={handleSaveSettings}
+            disabled={isSavingSettings || !localShopName.trim()}
+            className="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 uppercase tracking-wider shadow-sm"
+            id="save-shop-settings-btn"
+          >
+            {isSavingSettings ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4" />
+            )}
+            <span>{isSavingSettings ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+          </button>
+
+          {saveSuccess && (
+            <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl text-xs flex items-center gap-1.5 font-semibold border border-emerald-100 animate-fade-in" id="settings-save-success">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Pengaturan profil warung berhasil disimpan!</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
