@@ -29,8 +29,7 @@ echo.
 tasklist /nh /fi "imagename eq httpd.exe" | find /i "httpd.exe" > nul
 if %errorlevel% neq 0 (
     echo [INFO] Menyalakan Web Server Apache...
-    cd /d "%XAMPP_PATH%\apache\bin"
-    start /b httpd.exe
+    start "" /d "%XAMPP_PATH%\apache\bin" "%XAMPP_PATH%\apache\bin\httpd.exe"
 ) else (
     echo [INFO] Apache sudah berjalan.
 )
@@ -39,8 +38,7 @@ if %errorlevel% neq 0 (
 tasklist /nh /fi "imagename eq mysqld.exe" | find /i "mysqld.exe" > nul
 if %errorlevel% neq 0 (
     echo [INFO] Menyalakan Database MySQL...
-    cd /d "%XAMPP_PATH%\mysql\bin"
-    start /b mysqld.exe
+    start "" /d "%XAMPP_PATH%\mysql\bin" "%XAMPP_PATH%\mysql\bin\mysqld.exe" --defaults-file="%XAMPP_PATH%\mysql\bin\my.ini" --standalone
 ) else (
     echo [INFO] MySQL sudah berjalan.
 )
