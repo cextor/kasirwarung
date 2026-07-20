@@ -1,11 +1,11 @@
 import { Category, Product, Sale } from '../types';
 
 const getApiBaseUrl = () => {
-  // If in development mode, direct requests to backend spark port (8080)
-  if (window.location.port === '3000' || window.location.port === '3001' || window.location.port === '5173' || (window.location.hostname === 'localhost' && window.location.port !== '8080')) {
+  // If in development mode (running via Vite dev server), direct requests to backend spark port (8080)
+  if (window.location.port === '3000' || window.location.port === '3001' || window.location.port === '5173') {
     return 'http://localhost:8080/api';
   }
-  // Otherwise, use relative path relative to current URL pathname (so it works on XAMPP)
+  // Otherwise, use relative path relative to current URL pathname (so it works on XAMPP/Apache)
   let path = window.location.pathname;
   if (path.endsWith('.html') || path.endsWith('.php')) {
     path = path.substring(0, path.lastIndexOf('/'));
