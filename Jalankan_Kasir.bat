@@ -5,19 +5,32 @@ echo       MEMULAI APLIKASI KASIR WARUNG
 echo ==============================================
 echo.
 
+:: Tentukan lokasi XAMPP secara otomatis (Cari di D:, E:, atau C:)
+set "XAMPP_PATH="
+if exist "D:\xampp\apache\bin\httpd.exe" (
+    set "XAMPP_PATH=D:\xampp"
+) else if exist "E:\xampp\apache\bin\httpd.exe" (
+    set "XAMPP_PATH=E:\xampp"
+) else if exist "C:\xampp\apache\bin\httpd.exe" (
+    set "XAMPP_PATH=C:\xampp"
+)
+
+if "%XAMPP_PATH%"=="" (
+    echo [ERROR] Folder instalasi XAMPP tidak ditemukan di Drive C:, D:, atau E:!
+    echo Silakan pastikan XAMPP terinstall di salah satu drive tersebut.
+    pause
+    exit
+)
+
+echo [INFO] XAMPP terdeteksi di: %XAMPP_PATH%
+echo.
+
 :: 1. Cek apakah Apache XAMPP sedang berjalan
 tasklist /nh /fi "imagename eq httpd.exe" | find /i "httpd.exe" > nul
 if %errorlevel% neq 0 (
     echo [INFO] Menyalakan Web Server Apache...
-    if exist "D:\xampp\apache\bin\httpd.exe" (
-        cd /d "D:\xampp\apache\bin"
-        start /b httpd.exe
-    ) else (
-        echo [ERROR] Apache tidak ditemukan di D:\xampp\apache\bin\httpd.exe
-        echo Silakan pastikan XAMPP terinstall di Drive D:
-        pause
-        exit
-    )
+    cd /d "%XAMPP_PATH%\apache\bin"
+    start /b httpd.exe
 ) else (
     echo [INFO] Apache sudah berjalan.
 )
@@ -26,15 +39,8 @@ if %errorlevel% neq 0 (
 tasklist /nh /fi "imagename eq mysqld.exe" | find /i "mysqld.exe" > nul
 if %errorlevel% neq 0 (
     echo [INFO] Menyalakan Database MySQL...
-    if exist "D:\xampp\mysql\bin\mysqld.exe" (
-        cd /d "D:\xampp\mysql\bin"
-        start /b mysqld.exe
-    ) else (
-        echo [ERROR] MySQL tidak ditemukan di D:\xampp\mysql\bin\mysqld.exe
-        echo Silakan pastikan XAMPP terinstall di Drive D:
-        pause
-        exit
-    )
+    cd /d "%XAMPP_PATH%\mysql\bin"
+    start /b mysqld.exe
 ) else (
     echo [INFO] MySQL sudah berjalan.
 )
