@@ -541,7 +541,6 @@ export default function App() {
                 <Store className="w-6 h-6 text-white shrink-0" />
                 <div className="min-w-0">
                   <h2 className="font-extrabold text-sm uppercase tracking-wide leading-tight truncate">{shopName}</h2>
-                  <span className="text-[10px] text-indigo-100 font-medium opacity-85 uppercase tracking-wider">WarungDigital POS</span>
                 </div>
               </div>
             </div>
@@ -552,7 +551,6 @@ export default function App() {
                 <Store className="w-6 h-6 text-white shrink-0" />
                 <div className="min-w-0">
                   <h2 className="font-extrabold text-sm uppercase tracking-wide leading-tight truncate">{shopName}</h2>
-                  <span className="text-[10px] text-indigo-100 font-medium opacity-85 uppercase tracking-wider">WarungDigital POS</span>
                 </div>
               </div>
             </div>
